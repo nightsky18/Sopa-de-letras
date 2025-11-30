@@ -1,23 +1,31 @@
-import logo from './logo.svg';
-import './App.css';
+import React, { useEffect, useState } from 'react';
+import Board from './components/Board';
+import socket from './services/socket';
 
 function App() {
+  const [boardMatrix, setBoardMatrix] = useState([]);
+
+  useEffect(() => {
+    socket.on('connect', () => {
+      console.log('Conectado al servidor');
+      socket.emit('requestBoard');      // pedir tablero al conectar
+    });
+
+    socket.on('boardGenerated', (board) => {
+      console.log('Tablero recibido', board);
+      setBoardMatrix(board.matrix);
+    });
+
+    return () => {
+      socket.off('connect');
+      socket.off('boardGenerated');
+    };
+  }, []);
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div>
+      <h1>Tablero Sopa de Letras</h1>
+      <Board matrix={boardMatrix} />
     </div>
   );
 }

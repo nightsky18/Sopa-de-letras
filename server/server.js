@@ -1,43 +1,39 @@
 // server/server.js
 const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const cors = require('cors');
 const connectDB = require('./config/db');
-const { Worker } = require('worker_threads');
+const socketSetup = require('./socket'); // <-- IMPORTANTE
+
 const app = express();
+const server = http.createServer(app);
 
-connectDB(); // Conectar a MongoDB
-
-server.listen(PORT, () => {
-  console.log(`Servidor corriendo en puerto ${PORT}`);
+const io = socketIo(server, {
+  cors: {
+    origin: 'http://localhost:3000',
+    methods: ['GET', 'POST'],
+  },
 });
 
-function validarPalabraConcurrente(word, callback) {
-  const worker = new Worker('./workers/wordValidator.js', {
-    workerData: { word }
-  });
+const PORT = process.env.PORT || 4000;
 
-  worker.on('message', (result) => {
-    callback(null, result);
-  });
+// conectar BD
+connectDB();
 
-  worker.on('error', (err) => {
-    callback(err);
-  });
-}
-// Middleware para parsear JSON
+// middlewares
+app.use(cors({ origin: 'http://localhost:3000' }));
 app.use(express.json());
 
-// Ruta de prueba
+// ruta de prueba
 app.get('/', (req, res) => {
   res.send('Servidor Express con Socket.io funcionando');
 });
 
-// Configurar eventos de Socket.io
-io.on('connection', (socket) => {
-  console.log('Cliente conectado:', socket.id);
+// configurar sockets
+socketSetup(io); // <-- AQUÍ SE USA
 
-  socket.on('disconnect', () => {
-    console.log('Cliente desconectado:', socket.id);
-  });
+// iniciar servidor
+server.listen(PORT, () => {
+  console.log(`Servidor corriendo en puerto ${PORT}`);
 });
-
-// Iniciar servidor HTTP con Socket.io
