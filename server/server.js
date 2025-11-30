@@ -1,15 +1,31 @@
 // server/server.js
 const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
 const connectDB = require('./config/db');
+const gameSessionRoutes = require('./routes/gameSessionRoutes');
 const { Worker } = require('worker_threads');
+
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
+
+const PORT = process.env.PORT || 4000;
 
 connectDB(); // Conectar a MongoDB
 
-server.listen(PORT, () => {
-  console.log(`Servidor corriendo en puerto ${PORT}`);
+// Middleware para parsear JSON
+app.use(express.json());
+
+// Rutas API
+app.use('/api', gameSessionRoutes);
+
+// Ruta de prueba
+app.get('/', (req, res) => {
+  res.send('Servidor Express con Socket.io funcionando');
 });
 
+// Función para validar palabra con Worker Thread
 function validarPalabraConcurrente(word, callback) {
   const worker = new Worker('./workers/wordValidator.js', {
     workerData: { word }
@@ -23,13 +39,6 @@ function validarPalabraConcurrente(word, callback) {
     callback(err);
   });
 }
-// Middleware para parsear JSON
-app.use(express.json());
-
-// Ruta de prueba
-app.get('/', (req, res) => {
-  res.send('Servidor Express con Socket.io funcionando');
-});
 
 // Configurar eventos de Socket.io
 io.on('connection', (socket) => {
@@ -41,3 +50,9 @@ io.on('connection', (socket) => {
 });
 
 // Iniciar servidor HTTP con Socket.io
+server.listen(PORT, () => {
+  console.log(`Servidor corriendo en puerto ${PORT}`);
+});
+
+
+
