@@ -1,11 +1,12 @@
+// server/models/GameSession.js
 const mongoose = require('mongoose');
 
 const GameSessionSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  board: { type: mongoose.Schema.Types.ObjectId, ref: 'Board', required: true }, // referencia al tablero
-  foundWords: { type: [String], default: [] }, // palabras encontradas
-  timeSpent: { type: Number, default: 0 }, // segundos jugados
-  status: { type: String, default: 'playing' }, // playing, finished, etc.
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  board: { type: mongoose.Schema.Types.ObjectId, ref: 'Board', required: true },
+  foundWords: { type: [String], default: [] },
+  timeSpent: { type: Number, default: 0 },
+  status: { type: String, default: 'playing' },
   createdAt: { type: Date, default: Date.now },
 });
 

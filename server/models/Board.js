@@ -4,8 +4,8 @@ const mongoose = require('mongoose');
 const BoardSchema = new mongoose.Schema({
   rows: { type: Number, required: true },
   columns: { type: Number, required: true },
-  matrix: { type: [[String]], required: true }, // matriz de letras
-  wordsPlaced: { type: [String], default: [] }, // palabras que están en el tablero
+  matrix: { type: [[String]], required: true },
+  wordsPlaced: { type: [String], default: [] },
 });
 
 module.exports = mongoose.model('Board', BoardSchema);

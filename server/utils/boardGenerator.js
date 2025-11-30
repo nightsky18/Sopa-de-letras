@@ -1,3 +1,5 @@
+// server/utils/boardGenerator.js
+const Word = require('../models/Word');
 
 function generateEmptyMatrix(rows, columns) {
   return Array.from({ length: rows }, () => Array(columns).fill(''));
@@ -47,14 +49,15 @@ function fillEmptySpaces(matrix) {
   return matrix;
 }
 
-// Función principal de generación de tablero
-function generateBoard(words, rows = 10, columns = 10) {
+async function generateBoard(rows = 15, columns = 15, minWords = 10) {
+  // Traer al menos minWords palabras aleatorias de la base de datos
+  const wordsDocs = await Word.aggregate([{ $sample: { size: minWords } }]);
+  const words = wordsDocs.map(w => w.text.toUpperCase());
+
   let matrix = generateEmptyMatrix(rows, columns);
   let wordsPlaced = [];
 
   for (const word of words) {
-    const upperWord = word.toUpperCase();
-
     let placed = false;
     let attempts = 0;
 
@@ -62,21 +65,21 @@ function generateBoard(words, rows = 10, columns = 10) {
       const horizontal = Math.random() < 0.5;
       if (horizontal) {
         const row = Math.floor(Math.random() * rows);
-        const colStart = Math.floor(Math.random() * (columns - upperWord.length + 1));
+        const colStart = Math.floor(Math.random() * (columns - word.length + 1));
 
-        if (canPlaceWordHorizontally(matrix, upperWord, row, colStart)) {
-          placeWordHorizontally(matrix, upperWord, row, colStart);
+        if (canPlaceWordHorizontally(matrix, word, row, colStart)) {
+          placeWordHorizontally(matrix, word, row, colStart);
           placed = true;
-          wordsPlaced.push(upperWord);
+          wordsPlaced.push(word);
         }
       } else {
-        const rowStart = Math.floor(Math.random() * (rows - upperWord.length + 1));
+        const rowStart = Math.floor(Math.random() * (rows - word.length + 1));
         const col = Math.floor(Math.random() * columns);
 
-        if (canPlaceWordVertically(matrix, upperWord, rowStart, col)) {
-          placeWordVertically(matrix, upperWord, rowStart, col);
+        if (canPlaceWordVertically(matrix, word, rowStart, col)) {
+          placeWordVertically(matrix, word, rowStart, col);
           placed = true;
-          wordsPlaced.push(upperWord);
+          wordsPlaced.push(word);
         }
       }
       attempts++;
