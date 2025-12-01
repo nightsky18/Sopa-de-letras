@@ -9,6 +9,7 @@ function App() {
   const [wordsToFind, setWordsToFind] = useState([]); // Lista total de palabras
   const [foundWords, setFoundWords] = useState([]);   // Lista de palabras ya encontradas (strings)
   const [foundCells, setFoundCells] = useState(new Set()); // Coordenadas encontradas (para el Board)
+   const [sessionId, setSessionId] = useState(null); // ID de la sesión de juego
 
   useEffect(() => {
     // 1. Conexión inicial
@@ -21,6 +22,7 @@ function App() {
     socket.on('boardGenerated', (data) => {
       setBoardMatrix(data.matrix);
       setWordsToFind(data.wordsPlaced); // Guardamos la lista para el panel
+      setSessionId(data.gameSessionId); // Guardamos el ID de la sesión
       console.log('Palabras a buscar:', data.wordsPlaced);
     });
 
@@ -56,10 +58,11 @@ function App() {
       <h1>Sopa de Letras</h1>
       
       <div className="game-container">
-        {/* Pasamos matrix y foundCells al Board */}
+        {/* Pasamos matrix, foundCells y sessionid al Board */}
         <Board 
           matrix={boardMatrix} 
           foundCells={foundCells} 
+          sessionId={sessionId}
         />
 
         {/* Pasamos listas al Panel */}

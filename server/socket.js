@@ -1,64 +1,111 @@
 // server/socket.js
 const { generateBoard } = require('./utils/boardGenerator');
-const { runWordValidation } = require('./utils/workerHandler'); // <--- IMPORTAR
-
-// Simulación de almacenamiento en memoria temporal (idealmente sería Redis o Mongo)
-// key: socket.id, value: { matrix, wordsPlaced, ... }
-const activeGames = {}; 
+const { runWordValidation } = require('./utils/workerHandler');
+const Board = require('./models/Board');
+const GameSession = require('./models/GameSession');
 
 function socketSetup(io) {
   io.on('connection', (socket) => {
     console.log('Cliente conectado:', socket.id);
 
-    // 1. Generar Tablero
+    // 1. INICIAR PARTIDA (Crear Board y GameSession en BD)
     socket.on('requestBoard', async () => {
       try {
-        // Generar tablero 15x15 con 10 palabras
+        // A. Generar lógica del tablero (15x15, 15 palabras)
         const { matrix, wordsPlaced } = await generateBoard(15, 15, 15);
         
-        // Guardar estado de la partida en memoria asociado al socket
-        activeGames[socket.id] = {
+        // B. Guardar Tablero físico en BD
+        const newBoard = new Board({
+          rows: 15,
+          columns: 15,
           matrix,
-          wordsPlaced,
-          foundWords: []
-        };
+          wordsPlaced
+        });
+        await newBoard.save();
 
-        // Enviar al cliente solo lo necesario (ocultar wordsPlaced si se quiere dificultad real, pero por ahora se envía)
-        // Enviamos wordsPlaced para que el cliente sepa qué buscar.
-        socket.emit('boardGenerated', { matrix, wordsPlaced });
+        // C. Crear Sesión de Juego en BD
+        const newSession = new GameSession({
+          board: newBoard._id,
+          startTime: new Date(),
+          status: 'playing'
+        });
+        await newSession.save();
+
+        // D. Enviar al cliente matriz + ID de sesión
+        socket.emit('boardGenerated', { 
+          matrix, 
+          wordsPlaced, 
+          gameSessionId: newSession._id.toString()
+        });
+
+        console.log(`Partida creada: ${newSession._id}`);
+
       } catch (err) {
-        console.error('Error generando tablero:', err);
+        console.error('Error creando partida:', err);
       }
     });
 
-    // 2. Validar Palabra (Nueva lógica con Worker)
+    // 2. VALIDAR PALABRA (Consultar y actualizar BD)
     socket.on('validateWord', async (data) => {
-      // data espera: { word: "SOL", selectedCells: [...] }
-      const game = activeGames[socket.id];
+      const { word, selectedCells, gameSessionId } = data;
 
-      if (!game) {
-        socket.emit('validationResult', { isValid: false, reason: 'Partida no encontrada' });
+      if (!gameSessionId) {
+        socket.emit('validationResult', { isValid: false, reason: 'Falta ID de sesión' });
         return;
       }
 
       try {
-        // Lanzar el Worker Thread
-        const result = await runWordValidation(
-          data.word, 
-          data.selectedCells, 
-          game.wordsPlaced, 
-          game.matrix
-        );
-
-        if (result.isValid) {
-          // Si es válida, añadir a encontradas
-          if (!game.foundWords.includes(result.word)) {
-            game.foundWords.push(result.word);
-          }
+        // A. Buscar sesión y tablero poblado
+        const session = await GameSession.findById(gameSessionId).populate('board');
+        
+        if (!session || session.status !== 'playing') {
+          socket.emit('validationResult', { isValid: false, reason: 'Partida no activa o no encontrada' });
+          return;
         }
 
-        // Responder al cliente
-        socket.emit('validationResult', result);
+        // B. Validar si ya la encontró antes
+        if (session.foundWords.includes(word.toUpperCase())) {
+          socket.emit('validationResult', { isValid: false, reason: 'Palabra ya encontrada' });
+          return;
+        }
+
+        // C. PREPARAR DATOS PARA EL WORKER
+        // Importante: Convertir objetos Mongoose a objetos planos JS para evitar DataCloneError
+        const plainWordsList = JSON.parse(JSON.stringify(session.board.wordsPlaced));
+        const plainMatrix = JSON.parse(JSON.stringify(session.board.matrix));
+
+        // D. Usar Worker para validar geometría y existencia
+        const validation = await runWordValidation(
+          word, 
+          selectedCells, 
+          plainWordsList, 
+          plainMatrix
+        );
+
+        if (validation.isValid) {
+          // E. Actualizar BD
+          session.foundWords.push(validation.word);
+          
+          // Verificar victoria
+          if (session.foundWords.length >= session.board.wordsPlaced.length) {
+            session.status = 'finished';
+            session.endTime = new Date();
+            console.log(`Partida ${session._id} finalizada con éxito.`);
+          }
+          
+          await session.save();
+
+          // Responder éxito
+          socket.emit('validationResult', validation);
+          
+          // Si terminó, avisar
+          if (session.status === 'finished') {
+             socket.emit('gameFinished', { score: session.foundWords.length });
+          }
+        } else {
+          // Responder fallo
+          socket.emit('validationResult', validation);
+        }
 
       } catch (err) {
         console.error('Error en validación:', err);
@@ -68,7 +115,6 @@ function socketSetup(io) {
 
     socket.on('disconnect', () => {
       console.log('Cliente desconectado:', socket.id);
-      delete activeGames[socket.id]; // Limpiar memoria
     });
   });
 }

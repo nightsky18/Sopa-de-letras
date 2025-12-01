@@ -3,7 +3,7 @@ import socket from '../services/socket';
 import '../App.css';
 
 // foundCells viene del padre (App.js)
-function Board({ matrix, foundCells }) {
+function Board({ matrix, foundCells, sessionId}) {
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState(null);
   const [selectedCells, setSelectedCells] = useState([]);
@@ -53,7 +53,8 @@ function Board({ matrix, foundCells }) {
       const wordString = selectedCells.map(cell => matrix[cell.row][cell.col]).join('');
       socket.emit('validateWord', {
         word: wordString,
-        selectedCells: selectedCells
+        selectedCells: selectedCells,
+        gameSessionId: sessionId
       });
       // Limpiamos selección visual inmediatamente, si es correcta App.js nos mandará el foundCells actualizado
       setSelectedCells([]);
