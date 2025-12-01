@@ -23,7 +23,7 @@ function StatsPanel({ topScores, recentGames }) {
           {topScores.map((game, i) => (
             <li key={i} className="stat-item top-score">
               <span className="stat-score">{Math.round(game.score)} pts</span>
-              <span className="stat-date">{formatDate(game.createdAt)}</span>
+              <span className="stat-date">{formatDate(game.startTime)}</span>
             </li>
           ))}
         </ul>
@@ -37,7 +37,7 @@ function StatsPanel({ topScores, recentGames }) {
               <span className="stat-info">
                 {game.status === 'finished' ? '🏆' : '🏳️'} {Math.round(game.score)} pts
               </span>
-              <span className="stat-date">{formatDate(game.createdAt)}</span>
+              <span className="stat-date">{formatDate(game.startTime)}</span>
             </li>
           ))}
         </ul>

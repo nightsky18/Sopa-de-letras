@@ -282,16 +282,16 @@ function socketSetup(io) {
             })
             .sort({ score: -1 }) // Mayor a menor
             .limit(5)
-            .select('score duration createdAt'); // Solo campos necesarios
+            .select('score status startTime'); // Solo campos necesarios
 
             // B. Últimas 5 Partidas (Cualquier estado)
             const recentGames = await GameSession.find({ 
                 user: userId,
                 status: { $ne: 'playing' } // No igual a 'playing'
             })
-            .sort({ createdAt: -1 }) // Más reciente primero
+            .sort({ startTime: -1 }) // Más reciente primero
             .limit(5)
-            .select('score status createdAt');
+            .select('score status startTime');
 
             socket.emit('userStats', { topScores, recentGames });
             
