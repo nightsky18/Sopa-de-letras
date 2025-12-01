@@ -1,3 +1,6 @@
+
+/* client/src/App.css */
+
 .App {
   text-align: center;
 }
@@ -35,4 +38,49 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Estilos para el tablero */
+.board-table {
+  border-collapse: collapse;
+  margin: 20px auto;
+  user-select: none; /* Evita que se seleccione el texto al arrastrar */
+  background-color: #fff;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.board-cell {
+  width: 40px;
+  height: 40px;
+  border: 1px solid #ddd;
+  text-align: center;
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.1s;
+}
+
+/* Celda normal al pasar el mouse */
+.board-cell:hover {
+  background-color: #f0f0f0;
+}
+
+/* Celda que está siendo seleccionada actualmente (mientras arrastras) */
+.cell-selected {
+  background-color: #64b5f6 !important; /* Azul claro */
+  color: white;
+}
+
+/* Celda ya encontrada y validada por el servidor */
+.cell-found {
+  background-color: #66bb6a !important; /* Verde */
+  color: white;
+  animation: popIn 0.3s ease-out;
+}
+
+/* Animación suave al encontrar */
+@keyframes popIn {
+  0% { transform: scale(0.8); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
 }
