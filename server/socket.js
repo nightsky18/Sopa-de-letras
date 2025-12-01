@@ -23,15 +23,17 @@ function socketSetup(io) {
         const payload = data || {};
         const userId = payload.userId || 'anon_' + Date.now();
 
-        // A. Generar lógica del tablero (15x15, 15 palabras)
-        const { matrix, wordsPlaced } = await generateBoard(15, 15, 15);
+        const difficulty = data.difficulty || 2; // Recibir nivel de dificultad deseado
+
+        // A. Generar lógica del tablero (según dificultad)
+        const { matrix, wordsPlaced } = await generateBoard(difficulty);
         
         // B. Guardar Tablero físico en BD
         const newBoard = new Board({
-          rows: 15,
-          columns: 15,
-          matrix,
-          wordsPlaced
+            rows: matrix.length,     // Dinámico
+            columns: matrix[0].length, // Dinámico
+            matrix,
+            wordsPlaced
         });
         await newBoard.save();
 
@@ -41,7 +43,7 @@ function socketSetup(io) {
           board: newBoard._id,
             user: userId, // GUARDAMOS EL USUARIO
             status: 'playing',
-            difficultyLevel: 2 // Default por ahora
+             difficultyLevel: difficulty // Guardar nivel jugado
         });
         await newSession.save();
 
@@ -265,6 +267,32 @@ function socketSetup(io) {
             console.log(`Partida ${session._id} abandonada (Score: ${session.score}).`);
             
         } catch(err) {
+            console.error(err);
+        }
+    });
+
+    // 6. PEDIR ESTADÍSTICAS
+    socket.on('requestUserStats', async (data) => {
+        const { userId } = data;
+        try {
+            // A. Top 5 Mejores Scores (Solo finalizadas)
+            const topScores = await GameSession.find({ 
+                user: userId, 
+                status: 'finished' 
+            })
+            .sort({ score: -1 }) // Mayor a menor
+            .limit(5)
+            .select('score duration createdAt'); // Solo campos necesarios
+
+            // B. Últimas 5 Partidas (Cualquier estado)
+            const recentGames = await GameSession.find({ user: userId })
+            .sort({ createdAt: -1 }) // Más reciente primero
+            .limit(5)
+            .select('score status createdAt');
+
+            socket.emit('userStats', { topScores, recentGames });
+            
+        } catch (err) {
             console.error(err);
         }
     });

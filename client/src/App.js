@@ -5,6 +5,8 @@ import Timer from './components/Timer';
 import socket from './services/socket';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
+import StatsPanel from './components/StatsPanel';
+import { predictDifficulty } from './services/aiModel';
 import './App.css';
 
 // Función auxiliar fuera del componente para obtener/generar user ID persistente
@@ -26,9 +28,19 @@ function App() {
   const [isGameActive, setIsGameActive] = useState(false); 
   const [gameMessage, setGameMessage] = useState(''); 
   const [timerStart, setTimerStart] = useState(0); // Estado para pasar tiempo 
+  const [topScores, setTopScores] = useState([]); 
+  const [recentGames, setRecentGames] = useState([]); 
   const MySwal = withReactContent(Swal);
-
+  
   useEffect(() => {
+
+    const userId = getPersistentUserId(); // OBTENER USER ID SIEMPRE
+
+    // Función para refrescar stats
+    const refreshStats = () => {
+      socket.emit('requestUserStats', { userId });
+    };
+
     // 1. Conexión inicial
     socket.on('connect', () => {
       console.log('Conectado al servidor');
@@ -36,9 +48,6 @@ function App() {
       // --- LÓGICA DE RECONEXIÓN ---
       const savedSessionId = localStorage.getItem('sopa_game_id');
 
-      // OBTENER USER ID SIEMPRE
-      const userId = getPersistentUserId(); 
-      
       if (savedSessionId) {
         // En reanudación también enviamos user por seguridad/validación futura
         console.log('Intentando reanudar partida guardada...');
@@ -47,6 +56,7 @@ function App() {
         console.log('Iniciando nueva partida...');
         socket.emit('requestBoard', { userId });
       }
+      refreshStats(); // <--- Pedir al conectar
     });
 
     // Si el servidor dice que NO se puede reanudar (ej: ya acabó), pedimos nueva
@@ -86,7 +96,13 @@ function App() {
       setGameMessage('');
     });
 
-    // 2. Recibir tablero y lista de palabras
+    // Recibir datos
+    socket.on('userStats', (data) => {
+      setTopScores(data.topScores);
+      setRecentGames(data.recentGames);
+    });
+
+    // Recibir tablero y lista de palabras
     socket.on('boardGenerated', (data) => {
       setBoardMatrix(data.matrix);
       setWordsToFind(data.wordsPlaced); // Guardamos la lista para el panel
@@ -99,7 +115,7 @@ function App() {
       localStorage.setItem('sopa_game_id', data.gameSessionId);
     });
 
-    // 3. Escuchar fin de juego
+    // Escuchar fin de juego
     socket.on('gameFinished', (data) => {
       setIsGameActive(false); // <--- Parar reloj
       // Formatear segundos a MM:SS para el mensaje
@@ -109,6 +125,7 @@ function App() {
       localStorage.removeItem('sopa_game_id');
       
       setGameMessage(`¡Felicidades! Completado en ${timeStr}`);
+      refreshStats(); // <--- Pedir actualización de estadísticas
     });
 
     // 4. Escuchar resolución de juego (mostrar solución)
@@ -127,6 +144,7 @@ function App() {
       setFoundCells(newFoundCells);
       setGameMessage('Partida finalizada (Solución revelada)');
       localStorage.removeItem('sopa_game_id');
+      refreshStats(); // <--- Pedir actualización de estadísticas
     });
 
     // 5. Escuchar validaciones exitosas (Centralizado aquí)
@@ -196,7 +214,7 @@ function App() {
       showCancelButton: true,
       confirmButtonText: 'Sí, nueva partida',
       cancelButtonText: 'Cancelar'
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
         // 1. Si estaba jugando, avisar al server para que abandone la anterior
         if (sessionId && isGameActive) {
@@ -217,6 +235,37 @@ function App() {
         
         // 5. Pedir nueva
         socket.emit('requestBoard', { userId: currentUserId });
+        
+        // 6. Pedir stats nuevos tras abandonar la anterior
+        const userId = getPersistentUserId();
+        refreshStats(); // <--- Pedir actualización de estadísticas
+
+        // --- IA DECISION ---
+        // Usamos el estado 'recentGames' que ya tenemos en memoria gracias al StatsPanel
+        // (Asegúrate de que recentGames esté actualizado, si no, podríamos pedirlo de nuevo, 
+        // pero usualmente el estado de React ya lo tiene).
+        
+        let difficulty = 2; // Default
+        try {
+            difficulty = await predictDifficulty(recentGames);
+            console.log(`IA sugiere nivel: ${difficulty}`);
+            
+            // Feedback visual sutil
+            const nivelTexto = difficulty === 1 ? 'Fácil' : (difficulty === 3 ? 'Difícil' : 'Medio');
+            Swal.fire({
+                title: `Nivel Ajustado: ${nivelTexto}`,
+                text: 'La IA ha calibrado tu dificultad.',
+                timer: 1500,
+                showConfirmButton: false,
+                icon: 'info'
+            });
+            
+        } catch (e) {
+            console.error('Error IA:', e);
+        }
+
+        // Enviar petición con dificultad
+        socket.emit('requestBoard', { userId, difficulty });
       }
     });
   };
@@ -248,6 +297,10 @@ function App() {
       </div>
 
       <div className="game-container">
+        
+        {/* IZQUIERDA: Stats */}
+        <StatsPanel topScores={topScores} recentGames={recentGames} />
+
         {/* Pasamos matrix, foundCells y sessionid al Board */}
         <Board 
           matrix={boardMatrix} 
