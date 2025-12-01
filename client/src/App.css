@@ -84,3 +84,45 @@
   50% { transform: scale(1.1); }
   100% { transform: scale(1); }
 }
+
+/* Contenedor principal para layout lado a lado */
+.game-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 40px;
+  padding: 20px;
+  flex-wrap: wrap;
+}
+
+/* Panel de Control */
+.control-panel {
+  background: #f9f9f9;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  min-width: 200px;
+}
+
+.word-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.word-item {
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 1.1rem;
+  transition: all 0.3s;
+}
+
+.word-found {
+  text-decoration: line-through;
+  color: #aaa;
+  background-color: #e8f5e9;
+  font-weight: bold;
+}
