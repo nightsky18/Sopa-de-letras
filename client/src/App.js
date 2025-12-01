@@ -63,7 +63,7 @@ function App() {
     socket.on('errorResuming', () => {
       console.warn('No se pudo reanudar. Creando nueva...');
       localStorage.removeItem('sopa_game_id'); // Limpiar ID inválido
-      socket.emit('requestBoard');
+      socket.emit('requestBoard', { userId });
     });
 
     // Respuesta de reanudación exitosa
@@ -204,7 +204,7 @@ function App() {
     });
   };
 
-  const handleNewGame = () => {
+    const handleNewGame = () => {
     Swal.fire({
       title: '¿Nueva Partida?',
       text: isGameActive 
@@ -216,41 +216,33 @@ function App() {
       cancelButtonText: 'Cancelar'
     }).then(async (result) => {
       if (result.isConfirmed) {
-        // 1. Si estaba jugando, avisar al server para que abandone la anterior
+        const currentUserId = getPersistentUserId();
+
+        // 1. Si estaba jugando, abandonar la anterior
         if (sessionId && isGameActive) {
            socket.emit('abandonGame', { gameSessionId: sessionId });
         }
         
-        // 2. Limpiar SOLO game_id
+        // 2. Limpiar estado local
         localStorage.removeItem('sopa_game_id');
-        
-        // 3. Limpiar estados visuales
         setFoundWords([]);
         setFoundCells(new Set());
         setGameMessage('');
         setSessionId(null);
+        
+        // 3. Actualizar Stats (con un pequeño delay para dar tiempo al server de guardar el abandono)
+        setTimeout(() => {
+           // Usar clave 'userId'
+           socket.emit('requestUserStats', { userId: currentUserId });
+        }, 300);
 
-        // 4. Obtener User ID (SIN BORRARLO)
-        const currentUserId = getPersistentUserId();
-        
-        // 5. Pedir nueva
-        socket.emit('requestBoard', { userId: currentUserId });
-        
-        // 6. Pedir stats nuevos tras abandonar la anterior
-        const userId = getPersistentUserId();
-        refreshStats(); // <--- Pedir actualización de estadísticas
-
-        // --- IA DECISION ---
-        // Usamos el estado 'recentGames' que ya tenemos en memoria gracias al StatsPanel
-        // (Asegúrate de que recentGames esté actualizado, si no, podríamos pedirlo de nuevo, 
-        // pero usualmente el estado de React ya lo tiene).
-        
-        let difficulty = 2; // Default
+        // 4. Decisión IA
+        let difficulty = 2;
         try {
+            // Usamos 'recentGames' del estado actual para predecir
             difficulty = await predictDifficulty(recentGames);
             console.log(`IA sugiere nivel: ${difficulty}`);
             
-            // Feedback visual sutil
             const nivelTexto = difficulty === 1 ? 'Fácil' : (difficulty === 3 ? 'Difícil' : 'Medio');
             Swal.fire({
                 title: `Nivel Ajustado: ${nivelTexto}`,
@@ -259,13 +251,12 @@ function App() {
                 showConfirmButton: false,
                 icon: 'info'
             });
-            
         } catch (e) {
             console.error('Error IA:', e);
         }
 
-        // Enviar petición con dificultad
-        socket.emit('requestBoard', { userId, difficulty });
+        // 5. Pedir nueva partida (UNA SOLA VEZ)
+        socket.emit('requestBoard', { userId: currentUserId, difficulty });
       }
     });
   };
