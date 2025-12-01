@@ -5,36 +5,38 @@ function generateEmptyMatrix(rows, columns) {
   return Array.from({ length: rows }, () => Array(columns).fill(''));
 }
 
-function placeWordHorizontally(matrix, word, row, colStart) {
-  for (let i = 0; i < word.length; i++) {
-    matrix[row][colStart + i] = word[i];
-  }
-}
+// Direcciones posibles: [deltaRow, deltaCol]
+const DIRECTIONS = {
+  HORIZONTAL: [0, 1],
+  VERTICAL: [1, 0],
+  DIAGONAL_DOWN: [1, 1],  // \
+  DIAGONAL_UP: [-1, 1]    // /
+};
 
-function placeWordVertically(matrix, word, rowStart, col) {
+function canPlaceWord(matrix, word, row, col, dr, dc) {
+  const rows = matrix.length;
+  const cols = matrix[0].length;
+  
   for (let i = 0; i < word.length; i++) {
-    matrix[rowStart + i][col] = word[i];
-  }
-}
+    const r = row + (i * dr);
+    const c = col + (i * dc);
 
-function canPlaceWordHorizontally(matrix, word, row, colStart) {
-  if (colStart + word.length > matrix[0].length) return false;
-  for (let i = 0; i < word.length; i++) {
-    if (matrix[row][colStart + i] !== '' && matrix[row][colStart + i] !== word[i]) {
-      return false;
-    }
+    // 1. Verificar límites
+    if (r < 0 || r >= rows || c < 0 || c >= cols) return false;
+
+    // 2. Verificar colisión (celda vacía o misma letra)
+    const currentCell = matrix[r][c];
+    if (currentCell !== '' && currentCell !== word[i]) return false;
   }
   return true;
 }
 
-function canPlaceWordVertically(matrix, word, rowStart, col) {
-  if (rowStart + word.length > matrix.length) return false;
+function placeWord(matrix, word, row, col, dr, dc) {
   for (let i = 0; i < word.length; i++) {
-    if (matrix[rowStart + i][col] !== '' && matrix[rowStart + i][col] !== word[i]) {
-      return false;
-    }
+    const r = row + (i * dr);
+    const c = col + (i * dc);
+    matrix[r][c] = word[i];
   }
-  return true;
 }
 
 function fillEmptySpaces(matrix) {
@@ -49,10 +51,12 @@ function fillEmptySpaces(matrix) {
   return matrix;
 }
 
-async function generateBoard(rows = 15, columns = 15, minWords = 10) {
-  // Traer al menos minWords palabras aleatorias de la base de datos
+async function generateBoard(rows = 15, columns = 15, minWords = 15) {
   const wordsDocs = await Word.aggregate([{ $sample: { size: minWords } }]);
-  const words = wordsDocs.map(w => w.text.toUpperCase());
+  // Ordenar palabras de mayor a menor longitud ayuda a encajar las difíciles primero
+  const words = wordsDocs
+    .map(w => w.text.toUpperCase())
+    .sort((a, b) => b.length - a.length); 
 
   let matrix = generateEmptyMatrix(rows, columns);
   let wordsPlaced = [];
@@ -60,27 +64,23 @@ async function generateBoard(rows = 15, columns = 15, minWords = 10) {
   for (const word of words) {
     let placed = false;
     let attempts = 0;
+    const maxAttempts = 150; // Un poco más de intentos al ser más complejo
 
-    while (!placed && attempts < 100) {
-      const horizontal = Math.random() < 0.5;
-      if (horizontal) {
-        const row = Math.floor(Math.random() * rows);
-        const colStart = Math.floor(Math.random() * (columns - word.length + 1));
+    while (!placed && attempts < maxAttempts) {
+      // Elegir dirección aleatoria
+      const dirKeys = Object.keys(DIRECTIONS);
+      const randomDirKey = dirKeys[Math.floor(Math.random() * dirKeys.length)];
+      const [dr, dc] = DIRECTIONS[randomDirKey];
 
-        if (canPlaceWordHorizontally(matrix, word, row, colStart)) {
-          placeWordHorizontally(matrix, word, row, colStart);
-          placed = true;
-          wordsPlaced.push(word);
-        }
-      } else {
-        const rowStart = Math.floor(Math.random() * (rows - word.length + 1));
-        const col = Math.floor(Math.random() * columns);
+      // Elegir punto de inicio aleatorio
+      // (Optimizamos rango para no fallar tanto por límites, aunque canPlaceWord lo valida igual)
+      const startRow = Math.floor(Math.random() * rows);
+      const startCol = Math.floor(Math.random() * columns);
 
-        if (canPlaceWordVertically(matrix, word, rowStart, col)) {
-          placeWordVertically(matrix, word, rowStart, col);
-          placed = true;
-          wordsPlaced.push(word);
-        }
+      if (canPlaceWord(matrix, word, startRow, startCol, dr, dc)) {
+        placeWord(matrix, word, startRow, startCol, dr, dc);
+        placed = true;
+        wordsPlaced.push(word);
       }
       attempts++;
     }

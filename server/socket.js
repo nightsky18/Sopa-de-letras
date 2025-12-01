@@ -14,7 +14,7 @@ function socketSetup(io) {
     socket.on('requestBoard', async () => {
       try {
         // Generar tablero 15x15 con 10 palabras
-        const { matrix, wordsPlaced } = await generateBoard(15, 15, 10);
+        const { matrix, wordsPlaced } = await generateBoard(15, 15, 15);
         
         // Guardar estado de la partida en memoria asociado al socket
         activeGames[socket.id] = {
