@@ -194,3 +194,50 @@
 .new-game-btn:hover {
   background-color: #2980b9;
 }
+
+/* Asegurar layout de tres columnas */
+.game-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 20px;
+  flex-wrap: wrap; /* Importante para responsividad */
+}
+
+/* Panel Izquierdo */
+.stats-panel {
+  background: #ffffff;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  min-width: 200px;
+  font-size: 0.9rem;
+}
+
+.stats-list {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 20px;
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.stat-score {
+  font-weight: bold;
+  color: #27ae60;
+}
+
+.stat-date {
+  color: #999;
+  font-size: 0.8rem;
+}
+
+.status-abandoned .stat-info { color: #e74c3c; }
+.status-finished .stat-info { color: #27ae60; }
+.status-playing .stat-info { color: #3498db; }
