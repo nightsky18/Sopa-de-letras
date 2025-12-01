@@ -157,3 +157,19 @@
   font-weight: bold;
   animation: popIn 0.5s;
 }
+
+.resolve-btn {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-size: 1rem;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s;
+}
+
+.resolve-btn:hover {
+  background-color: #c0392b;
+}
