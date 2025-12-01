@@ -2,12 +2,16 @@
 const mongoose = require('mongoose');
 
 const GameSessionSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   board: { type: mongoose.Schema.Types.ObjectId, ref: 'Board', required: true },
-  foundWords: { type: [String], default: [] },
-  timeSpent: { type: Number, default: 0 },
-  status: { type: String, default: 'playing' },
-  createdAt: { type: Date, default: Date.now },
+  foundWords: { type: [String], default: [] }, // Palabras que el jugador ya encontró
+  score: { type: Number, default: 0 },         // Opcional: Puntos
+  startTime: { type: Date, default: Date.now },
+  endTime: { type: Date },
+  status: { 
+    type: String, 
+    enum: ['playing', 'finished', 'abandoned'], 
+    default: 'playing' 
+  }
 });
 
 module.exports = mongoose.model('GameSession', GameSessionSchema);
