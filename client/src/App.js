@@ -21,7 +21,44 @@ function App() {
     // 1. Conexión inicial
     socket.on('connect', () => {
       console.log('Conectado al servidor');
+
+      // --- LÓGICA DE RECONEXIÓN ---
+      const savedSessionId = localStorage.getItem('sopa_game_id');
+      
+      if (savedSessionId) {
+        console.log('Intentando reanudar sesión:', savedSessionId);
+        socket.emit('resumeGame', { gameSessionId: savedSessionId });
+      } else {
+        console.log('Iniciando nueva partida...');
+        socket.emit('requestBoard');
+      }
+    });
+
+    // Si el servidor dice que NO se puede reanudar (ej: ya acabó), pedimos nueva
+    socket.on('errorResuming', () => {
+      console.warn('No se pudo reanudar. Creando nueva...');
+      localStorage.removeItem('sopa_game_id'); // Limpiar ID inválido
       socket.emit('requestBoard');
+    });
+
+    // Respuesta de reanudación exitosa
+    socket.on('gameResumed', (data) => {
+      setBoardMatrix(data.matrix);
+      setWordsToFind(data.wordsPlaced);
+      setSessionId(data.gameSessionId);
+      setFoundWords(data.foundWords); // Restaurar estado de palabras encontradas
+
+      // --- HIDRATACIÓN VISUAL ---
+      const recoveredSet = new Set();
+      if (data.foundCells && Array.isArray(data.foundCells)) {
+        data.foundCells.forEach(cell => {
+           recoveredSet.add(`${cell.row}-${cell.col}`);
+        });
+      }
+      setFoundCells(recoveredSet);
+      
+      setIsGameActive(true);
+      setGameMessage('');
     });
 
     // 2. Recibir tablero y lista de palabras
@@ -33,6 +70,7 @@ function App() {
       setFoundCells(new Set());
       setIsGameActive(true); //Iniciar reloj
       setGameMessage('');
+      localStorage.setItem('sopa_game_id', data.gameSessionId);
     });
 
     // 3. Escuchar fin de juego
@@ -42,6 +80,7 @@ function App() {
       const m = Math.floor(data.duration / 60);
       const s = data.duration % 60;
       const timeStr = `${m}:${s.toString().padStart(2, '0')}`;
+      localStorage.removeItem('sopa_game_id');
       
       setGameMessage(`¡Felicidades! Completado en ${timeStr}`);
     });
@@ -61,6 +100,7 @@ function App() {
       
       setFoundCells(newFoundCells);
       setGameMessage('Partida finalizada (Solución revelada)');
+      localStorage.removeItem('sopa_game_id');
     });
 
     // 5. Escuchar validaciones exitosas (Centralizado aquí)
@@ -120,18 +160,56 @@ function App() {
     });
   };
 
+  const handleNewGame = () => {
+    Swal.fire({
+      title: '¿Nueva Partida?',
+      text: isGameActive 
+        ? "La partida actual se marcará como abandonada." 
+        : "Se generará un nuevo tablero.",
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, nueva partida',
+      cancelButtonText: 'Cancelar'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        // 1. Si estaba jugando, avisar al server para que abandone la anterior
+        if (sessionId && isGameActive) {
+           socket.emit('abandonGame', { gameSessionId: sessionId });
+        }
+        
+        // 2. Limpiar local storage
+        localStorage.removeItem('sopa_game_id');
+        
+        // 3. Limpiar estados visuales
+        setFoundWords([]);
+        setFoundCells(new Set());
+        setGameMessage('');
+        
+        // 4. Pedir nuevo tablero
+        socket.emit('requestBoard');
+      }
+    });
+  };
+
   return (
     <div className="App">
       <h1>Sopa de Letras</h1>
       
       <div className="header-controls">
         <Timer isActive={isGameActive} />
-        {/* Botón Resolver (solo visible si está jugando) */}
-        {isGameActive && (
-          <button className="resolve-btn" onClick={handleResolve}>
-            Resolver / Rendirse
-          </button>
-        )}
+        
+        <div className="button-group">
+            <button className="new-game-btn" onClick={handleNewGame}>
+                Nueva Partida
+            </button>
+
+            {isGameActive && (
+            <button className="resolve-btn" onClick={handleResolve}>
+                Rendirse
+            </button>
+            )}
+        </div>
+        
         {gameMessage && <div className="victory-message">{gameMessage}</div>}
       </div>
 

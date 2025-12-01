@@ -176,6 +176,68 @@ function socketSetup(io) {
       }
     });
 
+    // 4. REANUDAR PARTIDA
+    socket.on('resumeGame', async (data) => {
+      const { gameSessionId } = data;
+
+      try {
+        const session = await GameSession.findById(gameSessionId).populate('board');
+
+        // Validar si la sesión es válida para reanudar
+        if (!session || session.status !== 'playing') {
+          // Si no existe o ya terminó, avisamos para que el cliente borre su storage y pida una nueva
+          socket.emit('errorResuming', { message: 'Partida no válida o finalizada' });
+          return;
+        }
+
+        // RECUPERACIÓN DE COORDENADAS (Esfuerzo Extra)
+        // Buscamos en la matriz las coordenadas de cada palabra que está en session.foundWords
+        const recoveredCells = [];
+        const matrixObj = JSON.parse(JSON.stringify(session.board.matrix)); // Matriz plana
+
+        session.foundWords.forEach(word => {
+          const coords = findWordInMatrix(matrixObj, word);
+          if (coords.length > 0) {
+             // Agregamos todas las celdas de esta palabra al array plano
+             recoveredCells.push(...coords);
+          }
+        });
+
+        // Calcular tiempo transcurrido hasta ahora para sincronizar cronómetro (opcional pero bueno)
+        // El frontend puede usar su propio timer, pero enviar el startTime ayuda.
+        
+        // Reconstruir la respuesta como si fuera una partida nueva, pero con datos extra
+        socket.emit('gameResumed', {
+          matrix: session.board.matrix,
+          wordsPlaced: session.board.wordsPlaced,
+          foundWords: session.foundWords, // ¡Clave! Lista de palabras ya tachadas
+          gameSessionId: session._id.toString(),
+          startTime: session.startTime, // Para ajustar el reloj si quisiéramos
+          foundCells: recoveredCells
+        });
+        
+        console.log(`Partida ${session._id} reanudada.`);
+
+      } catch (err) {
+        console.error('Error reanudando partida:', err);
+        socket.emit('errorResuming', { message: 'Error interno' });
+      }
+    });
+
+    // 5. ABANDONAR EXPLICITAMENTE (Para botón "Nueva Partida")
+    socket.on('abandonGame', async (data) => {
+        const { gameSessionId } = data;
+        try {
+            await GameSession.findByIdAndUpdate(gameSessionId, { 
+                status: 'abandoned', 
+                endTime: new Date() 
+            });
+            // No necesitamos emitir nada especial, el cliente ya sabe que va a pedir una nueva
+        } catch(err) {
+            console.error(err);
+        }
+    });
+
     socket.on('disconnect', () => {
       console.log('Cliente desconectado:', socket.id);
     });
