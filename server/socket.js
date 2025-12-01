@@ -24,9 +24,9 @@ function socketSetup(io) {
         await newBoard.save();
 
         // C. Crear Sesión de Juego en BD
+        // Se guarda startTime automáticamente con el default: Date.now
         const newSession = new GameSession({
           board: newBoard._id,
-          startTime: new Date(),
           status: 'playing'
         });
         await newSession.save();
@@ -70,7 +70,7 @@ function socketSetup(io) {
         }
 
         // C. PREPARAR DATOS PARA EL WORKER
-        // Importante: Convertir objetos Mongoose a objetos planos JS para evitar DataCloneError
+        // Convertir objetos Mongoose a objetos planos JS para evitar DataCloneError
         const plainWordsList = JSON.parse(JSON.stringify(session.board.wordsPlaced));
         const plainMatrix = JSON.parse(JSON.stringify(session.board.matrix));
 
@@ -90,18 +90,33 @@ function socketSetup(io) {
           if (session.foundWords.length >= session.board.wordsPlaced.length) {
             session.status = 'finished';
             session.endTime = new Date();
-            console.log(`Partida ${session._id} finalizada con éxito.`);
-          }
-          
-          await session.save();
 
-          // Responder éxito
+            // --- CÁLCULO DE DURACIÓN (NUEVO) ---
+            // Calcular diferencia en segundos
+            const durationMs = session.endTime - session.startTime;
+            const durationSeconds = Math.floor(durationMs / 1000);
+            
+            // Guardar duración en el modelo
+            session.duration = durationSeconds;
+            
+            console.log(`Partida ${session._id} finalizada con éxito en ${durationSeconds}s.`);
+            
+            // Guardamos antes de emitir
+            await session.save();
+
+            // Emitir evento de finalización con el tiempo oficial
+            socket.emit('gameFinished', { 
+              score: session.foundWords.length,
+              duration: durationSeconds 
+            });
+          } else {
+            // Si no ha terminado, solo guardamos el progreso
+            await session.save();
+          }
+
+          // Responder éxito en la validación
           socket.emit('validationResult', validation);
           
-          // Si terminó, avisar
-          if (session.status === 'finished') {
-             socket.emit('gameFinished', { score: session.foundWords.length });
-          }
         } else {
           // Responder fallo
           socket.emit('validationResult', validation);

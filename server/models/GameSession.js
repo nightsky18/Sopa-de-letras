@@ -7,6 +7,7 @@ const GameSessionSchema = new mongoose.Schema({
   score: { type: Number, default: 0 },         // Opcional: Puntos
   startTime: { type: Date, default: Date.now },
   endTime: { type: Date },
+  duration: { type: Number, default: 0 }, // Duración en segundos
   status: { 
     type: String, 
     enum: ['playing', 'finished', 'abandoned'], 
