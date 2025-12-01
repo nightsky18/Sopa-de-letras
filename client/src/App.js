@@ -3,6 +3,8 @@ import Board from './components/Board';
 import ControlPanel from './components/ControlPanel';
 import Timer from './components/Timer';
 import socket from './services/socket';
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
 import './App.css';
 
 function App() {
@@ -13,6 +15,7 @@ function App() {
   const [sessionId, setSessionId] = useState(null); // ID de la sesión de juego
   const [isGameActive, setIsGameActive] = useState(false); 
   const [gameMessage, setGameMessage] = useState(''); 
+  const MySwal = withReactContent(Swal);
 
   useEffect(() => {
     // 1. Conexión inicial
@@ -43,7 +46,24 @@ function App() {
       setGameMessage(`¡Felicidades! Completado en ${timeStr}`);
     });
 
-    // 4. Escuchar validaciones exitosas (Centralizado aquí)
+    // 4. Escuchar resolución de juego (mostrar solución)
+    socket.on('resolveResult', (data) => {
+      setIsGameActive(false); // Detener reloj e interacciones
+      
+      // Marcar TODAS las celdas recibidas
+      const newFoundCells = new Set(foundCells); // Mantener las que ya tenía
+      
+      data.solutions.forEach(sol => {
+        sol.cells.forEach(cell => {
+          newFoundCells.add(`${cell.row}-${cell.col}`);
+        });
+      });
+      
+      setFoundCells(newFoundCells);
+      setGameMessage('Partida finalizada (Solución revelada)');
+    });
+
+    // 5. Escuchar validaciones exitosas (Centralizado aquí)
     socket.on('validationResult', (result) => {
       if (result.isValid) {
         // Actualizar lista de palabras encontradas
@@ -68,8 +88,37 @@ function App() {
       socket.off('boardGenerated');
       socket.off('validationResult');
       socket.off('gameFinished');
+      socket.off('resolveResult');
     };
-  }, []);
+  }, [foundCells]); // Añadimos dependencia foundCells para no perder las previas
+
+  const handleResolve = () => {
+    MySwal.fire({
+      title: '¿Te rindes?',
+      text: "Se mostrarán todas las soluciones y la partida terminará.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#e74c3c', // Rojo para acción destructiva
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, resolver',
+      cancelButtonText: 'Seguir jugando',
+      background: '#f9f9f9',
+      customClass: {
+        popup: 'my-swal-popup' // Opcional por si quieres más CSS
+      }
+    }).then((result) => {
+      if (result.isConfirmed) {
+        socket.emit('requestResolve', { gameSessionId: sessionId });
+        
+        // Opcional: Feedback inmediato
+        MySwal.fire(
+          '¡Resuelto!',
+          'Aquí tienes la solución.',
+          'info'
+        );
+      }
+    });
+  };
 
   return (
     <div className="App">
@@ -77,6 +126,12 @@ function App() {
       
       <div className="header-controls">
         <Timer isActive={isGameActive} />
+        {/* Botón Resolver (solo visible si está jugando) */}
+        {isGameActive && (
+          <button className="resolve-btn" onClick={handleResolve}>
+            Resolver / Rendirse
+          </button>
+        )}
         {gameMessage && <div className="victory-message">{gameMessage}</div>}
       </div>
 

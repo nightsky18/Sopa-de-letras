@@ -3,6 +3,7 @@ const { generateBoard } = require('./utils/boardGenerator');
 const { runWordValidation } = require('./utils/workerHandler');
 const Board = require('./models/Board');
 const GameSession = require('./models/GameSession');
+const { findWordInMatrix } = require('./utils/matrixSearch');
 
 function socketSetup(io) {
   io.on('connection', (socket) => {
@@ -125,6 +126,53 @@ function socketSetup(io) {
       } catch (err) {
         console.error('Error en validación:', err);
         socket.emit('validationResult', { isValid: false, error: 'Error interno del servidor' });
+      }
+    });
+
+     // 3. RESOLVER PARTIDA (Rendición)
+    socket.on('requestResolve', async (data) => {
+      const { gameSessionId } = data;
+      
+      try {
+        const session = await GameSession.findById(gameSessionId).populate('board');
+        
+        if (!session || session.status !== 'playing') {
+          return; // Ignorar si ya acabó
+        }
+
+        // Marcar como resuelta/abandonada
+        session.status = 'abandoned'; // O 'resolved' según prefieras
+        session.endTime = new Date();
+        
+        // Calcular tiempo (aunque sea abandono, registramos cuánto duró)
+        const durationSeconds = Math.floor((session.endTime - session.startTime) / 1000);
+        session.duration = durationSeconds;
+        
+        await session.save();
+
+        // Calcular TODAS las coordenadas de TODAS las palabras
+        const allSolutions = [];
+        // Convertir a objeto plano para evitar problemas de acceso
+        const matrix = JSON.parse(JSON.stringify(session.board.matrix));
+        const words = session.board.wordsPlaced;
+
+        words.forEach(word => {
+          const coords = findWordInMatrix(matrix, word);
+          if (coords.length > 0) {
+            allSolutions.push({ word, cells: coords });
+          }
+        });
+
+        // Emitir resultado
+        socket.emit('resolveResult', {
+          solutions: allSolutions,
+          duration: durationSeconds
+        });
+        
+        console.log(`Partida ${session._id} resuelta por abandono.`);
+
+      } catch (err) {
+        console.error('Error resolviendo partida:', err);
       }
     });
 
