@@ -15,6 +15,7 @@ function App() {
   const [sessionId, setSessionId] = useState(null); // ID de la sesión de juego
   const [isGameActive, setIsGameActive] = useState(false); 
   const [gameMessage, setGameMessage] = useState(''); 
+  const [timerStart, setTimerStart] = useState(0); // Estado para pasar tiempo 
   const MySwal = withReactContent(Swal);
 
   useEffect(() => {
@@ -56,6 +57,16 @@ function App() {
         });
       }
       setFoundCells(recoveredSet);
+
+      // CALCULAR TIEMPO TRANSCURRIDO
+      if (data.startTime) {
+        const start = new Date(data.startTime).getTime();
+        const now = new Date().getTime();
+        const elapsedSeconds = Math.floor((now - start) / 1000);
+        setTimerStart(elapsedSeconds); // Enviamos esto al Timer
+      } else {
+        setTimerStart(0);
+      }
       
       setIsGameActive(true);
       setGameMessage('');
@@ -68,6 +79,7 @@ function App() {
       setSessionId(data.gameSessionId); // Guardamos el ID de la sesión
       setFoundWords([]); // Reiniciar
       setFoundCells(new Set());
+      setTimerStart(0); // Nueva partida = 0 segundos
       setIsGameActive(true); //Iniciar reloj
       setGameMessage('');
       localStorage.setItem('sopa_game_id', data.gameSessionId);
@@ -196,7 +208,11 @@ function App() {
       <h1>Sopa de Letras</h1>
       
       <div className="header-controls">
-        <Timer isActive={isGameActive} />
+        <Timer 
+            key={sessionId || 'init'} 
+            isActive={isGameActive} 
+            initialSeconds={timerStart} 
+        />
         
         <div className="button-group">
             <button className="new-game-btn" onClick={handleNewGame}>
