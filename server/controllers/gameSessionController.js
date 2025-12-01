@@ -6,7 +6,7 @@ const Word = require('../models/Word');
 
 async function createGameSession(req, res) {
   try {
-    const { userId, rows = 10, columns = 10, wordCount = 5 } = req.body;
+    const { userId, rows = 15, columns = 15, wordCount = 15 } = req.body;
 
     // Obtener palabras aleatorias de la BD
     const wordsFromDB = await Word.aggregate([{ $sample: { size: wordCount } }]);
