@@ -7,6 +7,16 @@ import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import './App.css';
 
+// Función auxiliar fuera del componente para obtener/generar user ID persistente
+const getPersistentUserId = () => {
+  let id = localStorage.getItem('sopa_user_id');
+  if (!id) {
+    id = 'user_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+    localStorage.setItem('sopa_user_id', id);
+  }
+  return id;
+};
+
 function App() {
   const [boardMatrix, setBoardMatrix] = useState([]);
   const [wordsToFind, setWordsToFind] = useState([]); // Lista total de palabras
@@ -25,13 +35,17 @@ function App() {
 
       // --- LÓGICA DE RECONEXIÓN ---
       const savedSessionId = localStorage.getItem('sopa_game_id');
+
+      // OBTENER USER ID SIEMPRE
+      const userId = getPersistentUserId(); 
       
       if (savedSessionId) {
-        console.log('Intentando reanudar sesión:', savedSessionId);
-        socket.emit('resumeGame', { gameSessionId: savedSessionId });
+        // En reanudación también enviamos user por seguridad/validación futura
+        console.log('Intentando reanudar partida guardada...');
+        socket.emit('resumeGame', { gameSessionId: savedSessionId, userId});
       } else {
         console.log('Iniciando nueva partida...');
-        socket.emit('requestBoard');
+        socket.emit('requestBoard', { userId });
       }
     });
 
@@ -189,16 +203,20 @@ function App() {
            socket.emit('abandonGame', { gameSessionId: sessionId });
         }
         
-        // 2. Limpiar local storage
+        // 2. Limpiar SOLO game_id
         localStorage.removeItem('sopa_game_id');
         
         // 3. Limpiar estados visuales
         setFoundWords([]);
         setFoundCells(new Set());
         setGameMessage('');
+        setSessionId(null);
+
+        // 4. Obtener User ID (SIN BORRARLO)
+        const currentUserId = getPersistentUserId();
         
-        // 4. Pedir nuevo tablero
-        socket.emit('requestBoard');
+        // 5. Pedir nueva
+        socket.emit('requestBoard', { userId: currentUserId });
       }
     });
   };

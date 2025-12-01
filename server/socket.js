@@ -5,13 +5,24 @@ const Board = require('./models/Board');
 const GameSession = require('./models/GameSession');
 const { findWordInMatrix } = require('./utils/matrixSearch');
 
+// Helper para calcular score consistente
+function calculateScore(foundCount, durationSeconds) {
+    const basePoints = foundCount * 100;
+    const timePenalty = Math.floor(durationSeconds * 0.5); // 0.5 puntos menos por segundo
+    return Math.max(0, basePoints - timePenalty); // Nunca negativo
+}
+
 function socketSetup(io) {
   io.on('connection', (socket) => {
     console.log('Cliente conectado:', socket.id);
 
     // 1. INICIAR PARTIDA (Crear Board y GameSession en BD)
-    socket.on('requestBoard', async () => {
+    socket.on('requestBoard', async (data) => {
       try {
+        // Validar que data exista por si el cliente envía vacío
+        const payload = data || {};
+        const userId = payload.userId || 'anon_' + Date.now();
+
         // A. Generar lógica del tablero (15x15, 15 palabras)
         const { matrix, wordsPlaced } = await generateBoard(15, 15, 15);
         
@@ -28,7 +39,9 @@ function socketSetup(io) {
         // Se guarda startTime automáticamente con el default: Date.now
         const newSession = new GameSession({
           board: newBoard._id,
-          status: 'playing'
+            user: userId, // GUARDAMOS EL USUARIO
+            status: 'playing',
+            difficultyLevel: 2 // Default por ahora
         });
         await newSession.save();
 
@@ -99,6 +112,9 @@ function socketSetup(io) {
             
             // Guardar duración en el modelo
             session.duration = durationSeconds;
+
+            // CALCULAR SCORE
+            session.score = calculateScore(session.foundWords.length, durationSeconds);
             
             console.log(`Partida ${session._id} finalizada con éxito en ${durationSeconds}s.`);
             
@@ -147,6 +163,9 @@ function socketSetup(io) {
         // Calcular tiempo (aunque sea abandono, registramos cuánto duró)
         const durationSeconds = Math.floor((session.endTime - session.startTime) / 1000);
         session.duration = durationSeconds;
+
+        // CALCULAR SCORE (Incompleto)
+        session.score = calculateScore(session.foundWords.length, durationSeconds*2); // Penalización extra por abandono
         
         await session.save();
 
@@ -228,11 +247,23 @@ function socketSetup(io) {
     socket.on('abandonGame', async (data) => {
         const { gameSessionId } = data;
         try {
-            await GameSession.findByIdAndUpdate(gameSessionId, { 
-                status: 'abandoned', 
-                endTime: new Date() 
-            });
-            // No necesitamos emitir nada especial, el cliente ya sabe que va a pedir una nueva
+            const session = await GameSession.findById(gameSessionId);
+            if (!session) return;
+
+            session.status = 'abandoned';
+            session.endTime = new Date();
+            
+            // Calcular duración y score parcial
+            const durationSeconds = Math.floor((session.endTime - session.startTime) / 1000);
+            session.duration = durationSeconds;
+            
+            // Fórmula: Puntos base (lo que llevaba) - Penalización tiempo
+            // Es justo que tenga score positivo si encontró palabras, aunque abandone.
+            session.score = calculateScore(session.foundWords.length, durationSeconds*2); // Penalización extra por abandono
+            
+            await session.save();
+            console.log(`Partida ${session._id} abandonada (Score: ${session.score}).`);
+            
         } catch(err) {
             console.error(err);
         }
