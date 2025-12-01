@@ -173,3 +173,24 @@
 .resolve-btn:hover {
   background-color: #c0392b;
 }
+
+.button-group {
+  display: flex;
+  gap: 15px;
+}
+
+.new-game-btn {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-size: 1rem;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s;
+}
+
+.new-game-btn:hover {
+  background-color: #2980b9;
+}
