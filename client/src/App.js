@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+ import React, { useEffect, useState } from 'react';
 import Board from './components/Board';
 import ControlPanel from './components/ControlPanel';
 import Timer from './components/Timer';
@@ -9,11 +9,22 @@ import StatsPanel from './components/StatsPanel';
 import { predictDifficulty } from './services/aiModel';
 import './App.css';
 
-// Función auxiliar fuera del componente para obtener/generar user ID persistente
+const hasChosenInitialDifficulty = () => {
+  return localStorage.getItem('sopa_initial_difficulty_chosen') === 'true';
+};
+
+const markInitialDifficultyChosen = () => {
+  localStorage.setItem('sopa_initial_difficulty_chosen', 'true');
+};
+
+// Generar userId solo cuando se llame explícitamente
 const getPersistentUserId = () => {
   let id = localStorage.getItem('sopa_user_id');
   if (!id) {
-    id = 'user_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+    id =
+      'user_' +
+      Math.random().toString(36).substr(2, 9) +
+      Date.now().toString(36);
     localStorage.setItem('sopa_user_id', id);
   }
   return id;
@@ -21,147 +32,138 @@ const getPersistentUserId = () => {
 
 function App() {
   const [boardMatrix, setBoardMatrix] = useState([]);
-  const [wordsToFind, setWordsToFind] = useState([]); // Lista total de palabras
-  const [foundWords, setFoundWords] = useState([]);   // Lista de palabras ya encontradas (strings)
-  const [foundCells, setFoundCells] = useState(new Set()); // Coordenadas encontradas (para el Board)
-  const [sessionId, setSessionId] = useState(null); // ID de la sesión de juego
-  const [isGameActive, setIsGameActive] = useState(false); 
-  const [gameMessage, setGameMessage] = useState(''); 
-  const [timerStart, setTimerStart] = useState(0); // Estado para pasar tiempo 
-  const [topScores, setTopScores] = useState([]); 
-  const [recentGames, setRecentGames] = useState([]); 
+  const [wordsToFind, setWordsToFind] = useState([]);
+  const [foundWords, setFoundWords] = useState([]);
+  const [foundCells, setFoundCells] = useState(new Set());
+  const [sessionId, setSessionId] = useState(null);
+  const [isGameActive, setIsGameActive] = useState(false);
+  const [gameMessage, setGameMessage] = useState('');
+  const [timerStart, setTimerStart] = useState(0);
+  const [topScores, setTopScores] = useState([]);
+  const [recentGames, setRecentGames] = useState([]);
+  const [selectedDifficulty, setSelectedDifficulty] = useState(2);
+  const [hasSession, setHasSession] = useState(
+    !!localStorage.getItem('sopa_user_id')
+  );
   const MySwal = withReactContent(Swal);
-  
+
   useEffect(() => {
+    // Leer userId solo si existe
+    let userId = localStorage.getItem('sopa_user_id');
 
-    const userId = getPersistentUserId(); // OBTENER USER ID SIEMPRE
-
-    // Función para refrescar stats
     const refreshStats = () => {
-      socket.emit('requestUserStats', { userId });
+      if (userId) {
+        socket.emit('requestUserStats', { userId });
+      }
     };
 
-    // 1. Conexión inicial
     socket.on('connect', () => {
       console.log('Conectado al servidor');
-
-      // --- LÓGICA DE RECONEXIÓN ---
       const savedSessionId = localStorage.getItem('sopa_game_id');
 
-      if (savedSessionId) {
-        // En reanudación también enviamos user por seguridad/validación futura
+      if (userId && savedSessionId) {
         console.log('Intentando reanudar partida guardada...');
-        socket.emit('resumeGame', { gameSessionId: savedSessionId, userId});
+        socket.emit('resumeGame', { gameSessionId: savedSessionId, userId });
+      } else if (userId && !savedSessionId) {
+        console.log('Usuario existente sin partida activa, esperando Nueva Partida');
       } else {
-        console.log('Iniciando nueva partida...');
-        socket.emit('requestBoard', { userId });
+        console.log('Sin usuario activo, esperando Nueva Partida');
       }
-      refreshStats(); // <--- Pedir al conectar
+
+      refreshStats();
     });
 
-    // Si el servidor dice que NO se puede reanudar (ej: ya acabó), pedimos nueva
     socket.on('errorResuming', () => {
-      console.warn('No se pudo reanudar. Creando nueva...');
-      localStorage.removeItem('sopa_game_id'); // Limpiar ID inválido
-      socket.emit('requestBoard', { userId });
+      console.warn('No se pudo reanudar. Limpiando partida guardada');
+      localStorage.removeItem('sopa_game_id');
     });
 
-    // Respuesta de reanudación exitosa
     socket.on('gameResumed', (data) => {
       setBoardMatrix(data.matrix);
       setWordsToFind(data.wordsPlaced);
       setSessionId(data.gameSessionId);
-      setFoundWords(data.foundWords); // Restaurar estado de palabras encontradas
+      setFoundWords(data.foundWords || []);
 
-      // --- HIDRATACIÓN VISUAL ---
       const recoveredSet = new Set();
       if (data.foundCells && Array.isArray(data.foundCells)) {
-        data.foundCells.forEach(cell => {
-           recoveredSet.add(`${cell.row}-${cell.col}`);
+        data.foundCells.forEach((cell) => {
+          recoveredSet.add(`${cell.row}-${cell.col}`);
         });
       }
       setFoundCells(recoveredSet);
 
-      // CALCULAR TIEMPO TRANSCURRIDO
       if (data.startTime) {
         const start = new Date(data.startTime).getTime();
         const now = new Date().getTime();
         const elapsedSeconds = Math.floor((now - start) / 1000);
-        setTimerStart(elapsedSeconds); // Enviamos esto al Timer
+        setTimerStart(elapsedSeconds);
       } else {
         setTimerStart(0);
       }
-      
+
       setIsGameActive(true);
       setGameMessage('');
     });
 
-    // Recibir datos
     socket.on('userStats', (data) => {
-      setTopScores(data.topScores);
-      setRecentGames(data.recentGames);
+      setTopScores(data.topScores || []);
+      setRecentGames(data.recentGames || []);
     });
 
-    // Recibir tablero y lista de palabras
     socket.on('boardGenerated', (data) => {
-      setBoardMatrix(data.matrix);
-      setWordsToFind(data.wordsPlaced); // Guardamos la lista para el panel
-      setSessionId(data.gameSessionId); // Guardamos el ID de la sesión
-      setFoundWords([]); // Reiniciar
+      setBoardMatrix(data.matrix || []);
+      setWordsToFind(data.wordsPlaced || []);
+      setSessionId(data.gameSessionId || null);
+      setFoundWords([]);
       setFoundCells(new Set());
-      setTimerStart(0); // Nueva partida = 0 segundos
-      setIsGameActive(true); //Iniciar reloj
+      setTimerStart(0);
+      setIsGameActive(true);
       setGameMessage('');
-      localStorage.setItem('sopa_game_id', data.gameSessionId);
+      if (data.gameSessionId) {
+        localStorage.setItem('sopa_game_id', data.gameSessionId);
+      }
     });
 
-    // Escuchar fin de juego
     socket.on('gameFinished', (data) => {
-      setIsGameActive(false); // <--- Parar reloj
-      // Formatear segundos a MM:SS para el mensaje
+      setIsGameActive(false);
       const m = Math.floor(data.duration / 60);
       const s = data.duration % 60;
       const timeStr = `${m}:${s.toString().padStart(2, '0')}`;
       localStorage.removeItem('sopa_game_id');
-      
       setGameMessage(`¡Felicidades! Completado en ${timeStr}`);
-      refreshStats(); // <--- Pedir actualización de estadísticas
+      refreshStats();
     });
 
-    // 4. Escuchar resolución de juego (mostrar solución)
     socket.on('resolveResult', (data) => {
-      setIsGameActive(false); // Detener reloj e interacciones
-      
-      // Marcar TODAS las celdas recibidas
-      const newFoundCells = new Set(foundCells); // Mantener las que ya tenía
-      
-      data.solutions.forEach(sol => {
-        sol.cells.forEach(cell => {
+      setIsGameActive(false);
+      const newFoundCells = new Set(foundCells);
+
+      data.solutions.forEach((sol) => {
+        sol.cells.forEach((cell) => {
           newFoundCells.add(`${cell.row}-${cell.col}`);
         });
       });
-      
+
       setFoundCells(newFoundCells);
       setGameMessage('Partida finalizada (Solución revelada)');
       localStorage.removeItem('sopa_game_id');
-      refreshStats(); // <--- Pedir actualización de estadísticas
+      refreshStats();
     });
 
-    // 5. Escuchar validaciones exitosas (Centralizado aquí)
     socket.on('validationResult', (result) => {
       if (result.isValid) {
-        // Actualizar lista de palabras encontradas
-        setFoundWords(prev => {
+        setFoundWords((prev) => {
           if (!prev.includes(result.word)) {
             return [...prev, result.word];
           }
           return prev;
         });
 
-        // Actualizar celdas visuales (para el Board)
-        setFoundCells(prev => {
+        setFoundCells((prev) => {
           const newSet = new Set(prev);
-          result.cells.forEach(cell => newSet.add(`${cell.row}-${cell.col}`));
+          result.cells.forEach((cell) =>
+            newSet.add(`${cell.row}-${cell.col}`)
+          );
           return newSet;
         });
       }
@@ -173,90 +175,151 @@ function App() {
       socket.off('validationResult');
       socket.off('gameFinished');
       socket.off('resolveResult');
+      socket.off('userStats');
+      socket.off('gameResumed');
+      socket.off('errorResuming');
     };
-  }, [foundCells]); // Añadimos dependencia foundCells para no perder las previas
+  }, [foundCells]);
 
   const handleResolve = () => {
     MySwal.fire({
       title: '¿Te rindes?',
-      text: "Se mostrarán todas las soluciones y la partida terminará.",
+      text: 'Se mostrarán todas las soluciones y la partida terminará.',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#e74c3c', // Rojo para acción destructiva
+      confirmButtonColor: '#e74c3c',
       cancelButtonColor: '#3085d6',
       confirmButtonText: 'Sí, resolver',
       cancelButtonText: 'Seguir jugando',
       background: '#f9f9f9',
       customClass: {
-        popup: 'my-swal-popup' // Opcional por si quieres más CSS
-      }
+        popup: 'my-swal-popup',
+      },
     }).then((result) => {
       if (result.isConfirmed) {
         socket.emit('requestResolve', { gameSessionId: sessionId });
-        
-        // Opcional: Feedback inmediato
-        MySwal.fire(
-          '¡Resuelto!',
-          'Aquí tienes la solución.',
-          'info'
-        );
+
+        MySwal.fire('¡Resuelto!', 'Aquí tienes la solución.', 'info');
       }
     });
   };
 
-    const handleNewGame = () => {
+  const handleNewGame = () => {
     Swal.fire({
       title: '¿Nueva Partida?',
-      text: isGameActive 
-        ? "La partida actual se marcará como abandonada." 
-        : "Se generará un nuevo tablero.",
+      text: isGameActive
+        ? 'La partida actual se marcará como abandonada.'
+        : 'Se generará un nuevo tablero.',
       icon: 'question',
       showCancelButton: true,
       confirmButtonText: 'Sí, nueva partida',
-      cancelButtonText: 'Cancelar'
+      cancelButtonText: 'Cancelar',
     }).then(async (result) => {
       if (result.isConfirmed) {
-        const currentUserId = getPersistentUserId();
-
-        // 1. Si estaba jugando, abandonar la anterior
-        if (sessionId && isGameActive) {
-           socket.emit('abandonGame', { gameSessionId: sessionId });
+        // Crear o recuperar userId SOLO aquí
+        let currentUserId = localStorage.getItem('sopa_user_id');
+        if (!currentUserId) {
+          currentUserId = getPersistentUserId();
         }
-        
-        // 2. Limpiar estado local
+        setHasSession(true);
+
+        if (sessionId && isGameActive) {
+          socket.emit('abandonGame', { gameSessionId: sessionId });
+        }
+
         localStorage.removeItem('sopa_game_id');
         setFoundWords([]);
         setFoundCells(new Set());
         setGameMessage('');
         setSessionId(null);
-        
-        // 3. Actualizar Stats (con un pequeño delay para dar tiempo al server de guardar el abandono)
+
         setTimeout(() => {
-           // Usar clave 'userId'
-           socket.emit('requestUserStats', { userId: currentUserId });
+          socket.emit('requestUserStats', { userId: currentUserId });
         }, 300);
 
-        // 4. Decisión IA
-        let difficulty = 2;
-        try {
-            // Usamos 'recentGames' del estado actual para predecir
-            difficulty = await predictDifficulty(recentGames);
-            console.log(`IA sugiere nivel: ${difficulty}`);
-            
-            const nivelTexto = difficulty === 1 ? 'Fácil' : (difficulty === 3 ? 'Difícil' : 'Medio');
-            Swal.fire({
-                title: `Nivel Ajustado: ${nivelTexto}`,
-                text: 'La IA ha calibrado tu dificultad.',
-                timer: 1500,
-                showConfirmButton: false,
-                icon: 'info'
-            });
-        } catch (e) {
-            console.error('Error IA:', e);
+// Decisión de dificultad
+let difficulty;
+
+if (!hasChosenInitialDifficulty()) {
+  // Primera vez: usar lo que eligió el usuario
+  difficulty = selectedDifficulty;
+  markInitialDifficultyChosen();
+} else {
+  // Base: dificultad actual o previa
+  difficulty = selectedDifficulty;
+
+  try {
+    const aiSuggestion = await predictDifficulty(recentGames);
+    console.log(`IA sugiere nivel bruto: ${aiSuggestion}`);
+
+    // Redondear y limitar entre 1 y 3
+    let suggested = Math.round(aiSuggestion);
+    if (suggested < 1) suggested = 1;
+    if (suggested > 3) suggested = 3;
+
+    // Permitir cambiar hasta 2 niveles si el rendimiento es muy bajo
+    // Ej: de 3 (Difícil) a 1 (Fácil) tras muchas rendiciones
+    difficulty = suggested;
+
+    const nivelTexto =
+      difficulty === 1 ? 'Fácil' :
+      difficulty === 3 ? 'Difícil' : 'Medio';
+
+    Swal.fire({
+      title: `Nivel usado: ${nivelTexto}`,
+      text: 'La dificultad se ha ajustado según tu desempeño reciente.',
+      timer: 1500,
+      showConfirmButton: false,
+      icon: 'info',
+    });
+  } catch (e) {
+    console.error('Error IA:', e);
+    // Si falla la IA, quedate con selectedDifficulty
+  }
+}
+
+        socket.emit('requestBoard', { userId: currentUserId, difficulty });
+      }
+    });
+  };
+
+  const handleLogoutSession = () => {
+    Swal.fire({
+      title: '¿Cerrar sesión de juego?',
+      text: 'Se borrarán tus partidas activas y estadísticas locales.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, salir',
+      cancelButtonText: 'Cancelar',
+    }).then((result) => {
+      if (result.isConfirmed) {
+        if (sessionId && isGameActive) {
+          socket.emit('abandonGame', { gameSessionId: sessionId });
         }
 
-        // 5. Pedir nueva partida (UNA SOLA VEZ)
-        socket.emit('requestBoard', { userId: currentUserId, difficulty });
+        localStorage.removeItem('sopa_user_id');
+        localStorage.removeItem('sopa_game_id');
+        localStorage.removeItem('sopa_initial_difficulty_chosen');
+
+        setBoardMatrix([]);
+        setWordsToFind([]);
+        setFoundWords([]);
+        setFoundCells(new Set());
+        setSessionId(null);
+        setIsGameActive(false);
+        setGameMessage('');
+        setTimerStart(0);
+        setTopScores([]);
+        setRecentGames([]);
+        setHasSession(false);
+
+        Swal.fire({
+          title: 'Sesión cerrada',
+          text: 'Cuando vuelvas a jugar se creará un nuevo usuario y podrás elegir dificultad de nuevo.',
+          icon: 'info',
+          timer: 2000,
+          showConfirmButton: false,
+        });
       }
     });
   };
@@ -264,47 +327,60 @@ function App() {
   return (
     <div className="App">
       <h1>Sopa de Letras</h1>
-      
-      <div className="header-controls">
-        <Timer 
-            key={sessionId || 'init'} 
-            isActive={isGameActive} 
-            initialSeconds={timerStart} 
-        />
-        
-        <div className="button-group">
-            <button className="new-game-btn" onClick={handleNewGame}>
-                Nueva Partida
-            </button>
 
-            {isGameActive && (
+      <div className="header-controls">
+        <Timer
+          key={sessionId || 'init'}
+          isActive={isGameActive}
+          initialSeconds={timerStart}
+        />
+
+        {!hasChosenInitialDifficulty() && (
+          <div className="difficulty-selector">
+            <span>Dificultad inicial: </span>
+            <select
+              value={selectedDifficulty}
+              onChange={(e) => setSelectedDifficulty(Number(e.target.value))}
+            >
+              <option value={1}>Fácil</option>
+              <option value={2}>Medio</option>
+              <option value={3}>Difícil</option>
+            </select>
+          </div>
+        )}
+
+        <div className="button-group">
+          <button className="new-game-btn" onClick={handleNewGame}>
+            Nueva Partida
+          </button>
+
+          {isGameActive && (
             <button className="resolve-btn" onClick={handleResolve}>
-                Rendirse
+              Rendirse
             </button>
-            )}
+          )}
+
+          {hasSession && (
+            <button className="logout-btn" onClick={handleLogoutSession}>
+              Salir de la sesión
+            </button>
+          )}
         </div>
-        
+
         {gameMessage && <div className="victory-message">{gameMessage}</div>}
       </div>
 
       <div className="game-container">
-        
-        {/* IZQUIERDA: Stats */}
         <StatsPanel topScores={topScores} recentGames={recentGames} />
 
-        {/* Pasamos matrix, foundCells y sessionid al Board */}
-        <Board 
-          matrix={boardMatrix} 
-          foundCells={foundCells} 
+        <Board
+          matrix={boardMatrix}
+          foundCells={foundCells}
           sessionId={sessionId}
-          isActive={isGameActive} // bloquear tablero
+          isActive={isGameActive}
         />
 
-        {/* Pasamos listas al Panel */}
-        <ControlPanel 
-          wordsToFind={wordsToFind} 
-          foundWords={foundWords} 
-        />
+        <ControlPanel wordsToFind={wordsToFind} foundWords={foundWords} />
       </div>
     </div>
   );
