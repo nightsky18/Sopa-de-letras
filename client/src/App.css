@@ -73,8 +73,8 @@
 
 /* Celda ya encontrada y validada por el servidor */
 .cell-found {
-  background-color: #66bb6a !important; /* Verde */
-  color: white;
+  background-color: #13a71f96; /* Verde */
+  color: rgb(228, 215, 215);
   animation: popIn 0.3s ease-out;
 }
 
