@@ -45,6 +45,9 @@ function App() {
   const [hasSession, setHasSession] = useState(
     !!localStorage.getItem('sopa_user_id')
   );
+  const [cellColors, setCellColors] = useState({}); 
+const [nextColorId, setNextColorId] = useState(1);
+
   const MySwal = withReactContent(Swal);
 
   useEffect(() => {
@@ -135,20 +138,31 @@ function App() {
     });
 
     socket.on('resolveResult', (data) => {
-      setIsGameActive(false);
-      const newFoundCells = new Set(foundCells);
+  setIsGameActive(false);
 
-      data.solutions.forEach((sol) => {
-        sol.cells.forEach((cell) => {
-          newFoundCells.add(`${cell.row}-${cell.col}`);
-        });
-      });
+  // 1) marcar todas las celdas como encontradas
+  const newFoundCells = new Set(foundCells);
+  const newCellColors = { ...cellColors };
+  let colorId = nextColorId;
 
-      setFoundCells(newFoundCells);
-      setGameMessage('Partida finalizada (Solución revelada)');
-      localStorage.removeItem('sopa_game_id');
-      refreshStats();
+  data.solutions.forEach((sol) => {
+    // sol.cells: [{row, col}, ...]
+    sol.cells.forEach((cell) => {
+      const key = `${cell.row}-${cell.col}`;
+      newFoundCells.add(key);
+      newCellColors[key] = colorId;
     });
+    colorId += 1; // siguiente palabra, siguiente color
+  });
+
+  setFoundCells(newFoundCells);
+  setCellColors(newCellColors);
+  setNextColorId(colorId);
+
+  setGameMessage('Partida finalizada (Solución revelada)');
+  localStorage.removeItem('sopa_game_id');
+  refreshStats();
+});
 
     socket.on('validationResult', (result) => {
       if (result.isValid) {
@@ -159,15 +173,28 @@ function App() {
           return prev;
         });
 
-        setFoundCells((prev) => {
-          const newSet = new Set(prev);
-          result.cells.forEach((cell) =>
-            newSet.add(`${cell.row}-${cell.col}`)
-          );
-          return newSet;
-        });
-      }
+   // 2) celdas con id de color único por palabra
+    setFoundCells((prev) => {
+      const newSet = new Set(prev);
+      result.cells.forEach((cell) =>
+        newSet.add(`${cell.row}-${cell.col}`)
+      );
+      return newSet;
     });
+
+    setCellColors((prev) => {
+      const updated = { ...prev };
+      const colorId = nextColorId;
+      result.cells.forEach((cell) => {
+        const key = `${cell.row}-${cell.col}`;
+        updated[key] = colorId;
+      });
+      return updated;
+    });
+
+    setNextColorId((id) => id + 1);
+  }
+});
 
     return () => {
       socket.off('connect');
@@ -376,6 +403,7 @@ if (!hasChosenInitialDifficulty()) {
         <Board
           matrix={boardMatrix}
           foundCells={foundCells}
+          cellColors={cellColors}
           sessionId={sessionId}
           isActive={isGameActive}
         />

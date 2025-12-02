@@ -1,87 +1,59 @@
-
 /* client/src/App.css */
-
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #e4f1ef, #e3f2fd, #aaa8a6);
+  background-attachment: fixed; /* para que no se mueva al hacer scroll */
+}
 .App {
   text-align: center;
-}
-
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
-}
-
-.App-link {
-  color: #61dafb;
-}
-
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+ 
 }
 
 /* Estilos para el tablero */
 .board-table {
   border-collapse: collapse;
   margin: 20px auto;
-  user-select: none; /* Evita que se seleccione el texto al arrastrar */
-  background-color: #fff;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  user-select: none;
+  background-color: #ffffff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 6px 12px rgba(0,0,0,0.12);
 }
 
 .board-cell {
   width: 40px;
   height: 40px;
-  border: 1px solid #ddd;
+  border: 1px solid #826f6f;
   text-align: center;
   font-size: 1.2rem;
-  font-weight: bold;
+  font-weight: 700;
   cursor: pointer;
-  transition: background-color 0.1s;
+  transition: background-color 0.15s ease, transform 0.08s ease;
 }
 
 /* Celda normal al pasar el mouse */
 .board-cell:hover {
-  background-color: #f0f0f0;
+  background-color: #efe6e6c7;
 }
 
-/* Celda que está siendo seleccionada actualmente (mientras arrastras) */
+/* Celda seleccionada mientras arrastras */
 .cell-selected {
-  background-color: #64b5f6 !important; /* Azul claro */
-  color: white;
+  background-color: #5c605b !important;
+  color: #ffffff;
 }
 
-/* Celda ya encontrada y validada por el servidor */
+/* Celda encontrada (el color de fondo real lo pone inline según la palabra) */
 .cell-found {
-  background-color: #66bb6a !important; /* Verde */
-  color: white;
-  animation: popIn 0.3s ease-out;
+  color: #ffffff;
+  animation: popIn 0.25s ease-out;
 }
 
 /* Animación suave al encontrar */
 @keyframes popIn {
-  0% { transform: scale(0.8); }
-  50% { transform: scale(1.1); }
+  0%   { transform: scale(0.9); }
+  50%  { transform: scale(1.08); }
   100% { transform: scale(1); }
 }
 
@@ -90,101 +62,98 @@
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  gap: 40px;
-  padding: 20px;
+  gap: 24px;
+  padding: 20px 40px 40px;
   flex-wrap: wrap;
 }
 
 /* Panel de Control */
 .control-panel {
-  background: #f9f9f9;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-  min-width: 200px;
+  background: #f5f7f9;
+  padding: 18px 20px;
+  border-radius: 10px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+  min-width: 220px;
 }
 
 .word-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   max-height: 400px;
   overflow-y: auto;
 }
 
 .word-item {
   padding: 5px 10px;
-  border-radius: 4px;
+  border-radius: 6px;
   font-family: monospace;
-  font-size: 1.1rem;
-  transition: all 0.3s;
+  font-size: 1.05rem;
+  transition: background-color 0.2s, color 0.2s, transform 0.08s;
+}
+
+.word-item:hover {
+  background-color: #c1cef8;
+  transform: translateX(2px);
 }
 
 .word-found {
   text-decoration: line-through;
-  color: #aaa;
+  color: #109f3a;
   background-color: #e8f5e9;
-  font-weight: bold;
+  font-weight: 700;
 }
 
+/* Header de controles (timer, dificultad, botones) */
 .header-controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 40px;
-  margin-bottom: 20px;
+  padding: 10px 40px 0;
+  margin-bottom: 16px;
 }
+
 .difficulty-selector {
   display: flex;
   align-items: center;
   gap: 8px;
   font-weight: 500;
 }
+
 .difficulty-selector select {
-  padding: 4px 8px;
-  border-radius: 4px;
-  border: 1px solid #ccc;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #05454a;
+  background-color: #98deea;
+  font-size: 0.9rem;
 }
 
+/* Timer */
 .timer-container {
-  background-color: #333;
+  background-color: #474343;
   color: #fff;
   padding: 10px 20px;
   border-radius: 20px;
   font-family: 'Courier New', monospace;
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   font-weight: bold;
   display: flex;
   align-items: center;
-  gap: 10px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+  gap: 8px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.25);
 }
 
+/* Mensaje de victoria / estado */
 .victory-message {
-  background-color: #4caf50;
+  background-color: #57a559;
   color: white;
-  padding: 10px 20px;
-  border-radius: 5px;
-  font-weight: bold;
-  animation: popIn 0.5s;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  animation: popIn 0.4s;
 }
 
-.resolve-btn {
-  background-color: #e74c3c;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 5px;
-  font-size: 1rem;
-  cursor: pointer;
-  font-weight: bold;
-  transition: background 0.3s;
-}
-
-.resolve-btn:hover {
-  background-color: #c0392b;
-}
-
+/* Botones cabecera */
 .button-group {
   display: flex;
   align-items: center;
@@ -195,12 +164,13 @@
 .resolve-btn,
 .logout-btn {
   border: none;
-  border-radius: 6px;
-  padding: 8px 16px;
+  border-radius: 999px;
+  padding: 8px 18px;
   font-weight: 600;
   cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.2s, transform 0.1s, box-shadow 0.1s;
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+  transition: background-color 0.18s ease, transform 0.08s ease, box-shadow 0.1s ease;
 }
 
 /* Colores por acción */
@@ -210,17 +180,19 @@
 }
 
 .new-game-btn:hover {
-  background-color: #2980b9;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  background-color: #1d699b;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.18);
   transform: translateY(-1px);
 }
+
 .resolve-btn {
   background-color: #f39c12;
   color: #ffffff;
 }
+
 .resolve-btn:hover {
   background-color: #d98207;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.18);
   transform: translateY(-1px);
 }
 
@@ -231,50 +203,40 @@
 
 .logout-btn:hover {
   background-color: #c0392b;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.18);
   transform: translateY(-1px);
 }
 
-/* Asegurar layout de tres columnas */
-.game-container {
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  gap: 20px;
-  padding: 20px;
-  flex-wrap: wrap; /* Importante para responsividad */
-}
-
-/* Panel Izquierdo */
+/* Panel Izquierdo: Stats */
 .stats-panel {
-  background: #ffffff;
-  padding: 15px;
-  border-radius: 8px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-  min-width: 200px;
+  background: #e9e5e5;
+  padding: 16px 18px;
+  border-radius: 10px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+  min-width: 220px;
   font-size: 0.9rem;
 }
 
 .stats-list {
   list-style: none;
   padding: 0;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .stat-item {
   display: flex;
   justify-content: space-between;
-  padding: 8px 0;
-  border-bottom: 1px solid #eee;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .stat-score {
-  font-weight: bold;
-  color: #27ae60;
+  font-weight: 700;
+  color: #22b33f;
 }
 
 .stat-date {
-  color: #999;
+  color: #100c0c;
   font-size: 0.8rem;
 }
 
