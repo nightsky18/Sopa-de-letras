@@ -237,45 +237,46 @@ function App() {
           socket.emit('requestUserStats', { userId: currentUserId });
         }, 300);
 
-        // Decisión de dificultad
-        let difficulty;
+// Decisión de dificultad
+let difficulty;
 
-        if (!hasChosenInitialDifficulty()) {
-          difficulty = selectedDifficulty;
-          markInitialDifficultyChosen();
-        } else {
-          difficulty = selectedDifficulty;
-          try {
-            const aiSuggestion = await predictDifficulty(recentGames);
-            console.log(`IA sugiere nivel: ${aiSuggestion}`);
+if (!hasChosenInitialDifficulty()) {
+  // Primera vez: usar lo que eligió el usuario
+  difficulty = selectedDifficulty;
+  markInitialDifficultyChosen();
+} else {
+  // Base: dificultad actual o previa
+  difficulty = selectedDifficulty;
 
-            if (aiSuggestion > difficulty && aiSuggestion <= difficulty + 1) {
-              difficulty = aiSuggestion;
-            } else if (
-              aiSuggestion < difficulty &&
-              aiSuggestion >= difficulty - 1
-            ) {
-              difficulty = aiSuggestion;
-            }
+  try {
+    const aiSuggestion = await predictDifficulty(recentGames);
+    console.log(`IA sugiere nivel bruto: ${aiSuggestion}`);
 
-            const nivelTexto =
-              difficulty === 1
-                ? 'Fácil'
-                : difficulty === 3
-                ? 'Difícil'
-                : 'Medio';
+    // Redondear y limitar entre 1 y 3
+    let suggested = Math.round(aiSuggestion);
+    if (suggested < 1) suggested = 1;
+    if (suggested > 3) suggested = 3;
 
-            Swal.fire({
-              title: `Nivel usado: ${nivelTexto}`,
-              text: 'La dificultad se ha ajustado según tu desempeño.',
-              timer: 1500,
-              showConfirmButton: false,
-              icon: 'info',
-            });
-          } catch (e) {
-            console.error('Error IA:', e);
-          }
-        }
+    // Permitir cambiar hasta 2 niveles si el rendimiento es muy bajo
+    // Ej: de 3 (Difícil) a 1 (Fácil) tras muchas rendiciones
+    difficulty = suggested;
+
+    const nivelTexto =
+      difficulty === 1 ? 'Fácil' :
+      difficulty === 3 ? 'Difícil' : 'Medio';
+
+    Swal.fire({
+      title: `Nivel usado: ${nivelTexto}`,
+      text: 'La dificultad se ha ajustado según tu desempeño reciente.',
+      timer: 1500,
+      showConfirmButton: false,
+      icon: 'info',
+    });
+  } catch (e) {
+    console.error('Error IA:', e);
+    // Si falla la IA, quedate con selectedDifficulty
+  }
+}
 
         socket.emit('requestBoard', { userId: currentUserId, difficulty });
       }
